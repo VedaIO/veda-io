@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const blockSiteBtn = document.getElementById('block-site-btn');
 
   // For now, just show a static status.
-  statusElement.textContent = 'Ready';
+  statusElement.textContent = 'Sẵn sàng';
 
   blockSiteBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

@@ -38,17 +38,19 @@ func SearchAppEvents(db *sql.DB, query, since, until string) ([][]string, error)
 		args = append(args, likeQuery, likeQuery)
 	}
 
-	// The time-based filtering logic includes processes that were running within the specified time window.
+	// The time-based filtering logic finds processes that were *active* during the specified time window.
+	// A process is considered active if its own life span [start_time, end_time] overlaps with the filter window [since, until].
+	// This is true if the process started before the window ended AND the process ended after the window started.
 	if !sinceTime.IsZero() {
 		sinceUnix := sinceTime.Unix()
-		// A process is considered within the window if it ended after the 'since' time, or if it hasn't ended yet.
+		// Process must have ended after the window started, or still be running.
 		q += " AND (end_time IS NULL OR end_time >= ?)"
 		args = append(args, sinceUnix)
 	}
 
 	if !untilTime.IsZero() {
 		untilUnix := untilTime.Unix()
-		// A process is considered within the window if it started before the 'until' time.
+		// Process must have started before the window ended.
 		q += " AND start_time <= ?"
 		args = append(args, untilUnix)
 	}

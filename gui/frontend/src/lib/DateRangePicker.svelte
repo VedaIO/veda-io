@@ -1,3 +1,10 @@
+<!--
+  This component provides a user-friendly "From" and "To" date range picker.
+  It uses the `flatpickr` library directly because the `svelte-flatpickr` wrapper
+  was found to be incompatible with the project's modern Svelte and Vite setup,
+  causing build failures. Initializing `flatpickr` in `onMount` is a more robust
+  approach that avoids these build issues.
+-->
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import flatpickr from 'flatpickr';
@@ -83,7 +90,7 @@
     <input
       id="to-date-picker"
       bind:this={toInput}
-      placeholder="End date and time"
+      placeholder="Thời gian kết thúc"
       class="form-control"
     />
   </div>
