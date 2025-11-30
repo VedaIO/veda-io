@@ -11,19 +11,23 @@ all: build
 
 build:
 	@echo "Building ProcGuard for windows..."
-	cd procguard-wails && wails build -platform windows/amd64 -ldflags="-X main.version=$(VERSION)"
+	cd wails-app && wails build -platform windows/amd64 -ldflags="-X main.version=$(VERSION)"
 
 build-debug:
 	@echo "Building ProcGuard for windows..."
-	cd procguard-wails && wails build -platform windows/amd64 -debug
+	cd wails-app && wails build -platform windows/amd64 -debug
 
 fmt:
 	@echo "Formatting code..."
-	cd procguard-wails && go fmt ./...
-	cd procguard-wails/frontend && npm run format
+	cd wails-app && go fmt ./...
+	cd wails-app/frontend && npm run format
+
+lint:
+	cd wails-app && GOOS=windows golangci-lint run
+	cd frontend && npm run lint
 
 clean:
 	@echo "Cleaning..."
-	rm -rf procguard-wails/build/bin
-	rm -rf procguard-wails/frontend/dist
-	rm -rf procguard-wails/frontend/wailsjs
+	rm -rf wails-app/build/bin
+	rm -rf wails-app/frontend/dist
+	rm -rf wails-app/frontend/wailsjs
