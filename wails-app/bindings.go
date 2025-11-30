@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"wails-app/api"
+	"wails-app/internal/data"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -32,42 +33,48 @@ func NewApp() *App {
 }
 
 // CheckChromeExtension checks if the Chrome extension is connected
-// using a file-based heartbeat approach (works across processes)
-//
-// How it works:
-//   - Native messaging instances (separate processes) update a timestamp file
-//   - GUI reads the file to check if extension pinged recently
-//   - If file updated within last 10 seconds = Connected
-//
-// Why file-based:
-//   - Native messaging instances are SEPARATE PROCESSES
-//   - Can't share memory with GUI process
-//   - File is the only way to communicate state
-//
-// Returns: true if extension pinged within last 10 seconds
 func (a *App) CheckChromeExtension() bool {
+	log := data.GetLogger() // Use the logger we set up in main.go
+	
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {
+		log.Printf("[CheckExt] Error getting cache dir: %v", err)
 		return false
 	}
 	
 	heartbeatPath := filepath.Join(cacheDir, "procguard", "extension_heartbeat")
 	
 	// Read timestamp from file
-	data, err := os.ReadFile(heartbeatPath)
+	content, err := os.ReadFile(heartbeatPath)
 	if err != nil {
+		// Don't log "not exist" errors too noisily as it's expected when not installed
+		if !os.IsNotExist(err) {
+			log.Printf("[CheckExt] Error reading file: %v", err)
+		}
 		return false
 	}
 	
 	// Parse timestamp
 	var lastPing int64
-	if _, err := fmt.Sscanf(string(data), "%d", &lastPing); err != nil {
+	if _, err := fmt.Sscanf(string(content), "%d", &lastPing); err != nil {
+		log.Printf("[CheckExt] Error parsing timestamp '%s': %v", string(content), err)
 		return false
 	}
 	
 	// Check if ping is recent (within last 10 seconds)
 	pingTime := time.Unix(lastPing, 0)
-	return time.Since(pingTime) < 10*time.Second
+	timeSince := time.Since(pingTime)
+	isValid := timeSince < 10*time.Second
+	
+	if isValid {
+		// Only log on success to avoid spamming
+		// log.Printf("[CheckExt] Valid heartbeat found! Age: %v", timeSince)
+	} else {
+		// Log why it failed (stale)
+		// log.Printf("[CheckExt] Stale heartbeat. Age: %v (Limit: 10s)", timeSince)
+	}
+	
+	return isValid
 }
 
 // OpenBrowser opens a URL in the user's default system browser

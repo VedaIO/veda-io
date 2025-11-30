@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"wails-app/api"
 	"wails-app/internal/daemon"
@@ -63,51 +64,39 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func main() {
-	// CRITICAL: Detect if we're launched as a native messaging host
-	// Native messaging hosts have Stdin connected to a pipe (Chrome's stdout)
-	// GUI launches have Stdin as a terminal/invalid
-	stat, _ := os.Stdin.Stat()
-	isNativeMessagingMode := (stat.Mode() & os.ModeCharDevice) == 0
+	// CRITICAL: Log startup for debugging
+	// Use absolute path in CacheDir because CWD varies when launched by Chrome
+	cacheDir, _ := os.UserCacheDir()
+	logDir := filepath.Join(cacheDir, "procguard", "logs")
+	os.MkdirAll(logDir, 0755)
 	
-	if isNativeMessagingMode {
-		// We're a native messaging host - run messaging loop only, no GUI
-		log.Println("Starting in native messaging mode (no GUI)")
+	logPath := filepath.Join(logDir, "procguard_debug.log")
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if logFile != nil {
+		defer logFile.Close()
+		log.SetOutput(logFile)
+	}
+	
+	log.Printf("=== PROCGUARD LAUNCHED === Args: %v", os.Args)
+	log.Printf("CWD: %v", func() string { wd, _ := os.Getwd(); return wd }())
+
+	// MODE 1: NATIVE MESSAGING HOST
+	// Chrome launches us with the extension ID as an argument: chrome-extension://...
+	// In this mode, we MUST NOT show a GUI. We only run the message loop.
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "chrome-extension://") {
+		log.Println("[MODE] Native Messaging Host detected")
 		web.Run()
-		// When web.Run() exits (Chrome disconnects), this process terminates
+		log.Println("[MODE] Native Messaging Host exited")
 		return
 	}
+
+	// MODE 2: GUI APPLICATION
+	// User launched us (double-click, start menu, etc.)
+	log.Println("[MODE] GUI Application detected")
 	
-	// Normal GUI mode - create app instance
-	log.Println("Starting in GUI mode")
 	app := NewApp()
 
-	// Check if this is a native messaging launch (first instance)
-	// Chrome passes the extension origin as an argument: chrome-extension://<id>/
-	isNativeMessaging := false
-	for _, arg := range os.Args {
-		if strings.HasPrefix(arg, "chrome-extension://") {
-			isNativeMessaging = true
-			break
-		}
-	}
-	
-	// Fallback to WD check
-	if !isNativeMessaging {
-		wd, _ := os.Getwd()
-		if wd != "" {
-			wdLower := strings.ToLower(wd)
-			if strings.Contains(wdLower, "chrome") || strings.Contains(wdLower, "google") {
-				isNativeMessaging = true
-			}
-		}
-	}
-
-	if isNativeMessaging {
-		log.Println("First instance launched by Chrome (Native Messaging)")
-		app.IsNativeMessagingActive = true
-	}
-
-	// Create and run the Wails application with configuration
+	// Create and run the Wails application
 	err := wails.Run(&options.App{
 		Title:  "ProcGuard",
 		Width:  1024,
@@ -117,36 +106,25 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.startup,
-
-		// HideWindowOnClose: Hide window instead of closing application when X is clicked
-		// Why: Allows daemon to keep running in background while window is hidden
-		// User can reopen by double-clicking executable (SingleInstanceLock handles this)
+		
+		// HideWindowOnClose: Keep app running in background
 		HideWindowOnClose: true,
-
-		// SingleInstanceLock: Prevent multiple instances of the application
-		//
-		// Without this, running the executable multiple times creates multiple processes.
-		// Combined with HideWindowOnClose=true, this would cause hidden processes to accumulate.
-		//
-		// With SingleInstanceLock, only one GUI process can run at a time.
-		// Native messaging instances bypass this entirely (they exit main() early).
+		
+		// SingleInstanceLock: Ensure only one GUI instance runs
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.procguard.wails-app",
 			OnSecondInstanceLaunch: func(data options.SecondInstanceData) {
-				// This only fires for GUI launches (native messaging instances already exited)
 				log.Println("Second GUI instance detected - showing existing window")
 				app.ShowWindow()
 			},
 		},
 		
-		// Bind the app struct to make its methods available to frontend JS
-		// Frontend can call these via window.go.main.App.MethodName()
 		Bind: []interface{}{
 			app,
 		},
 	})
 
 	if err != nil {
-		println("Error:", err.Error())
+		log.Fatal("Error running Wails app:", err)
 	}
 }

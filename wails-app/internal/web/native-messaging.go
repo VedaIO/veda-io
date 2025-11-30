@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
+	"runtime/debug"
 	"time"
 	"wails-app/internal/data"
 )
@@ -17,6 +18,13 @@ const (
 	// pollInterval is the interval at which the web blocklist is polled for changes.
 	pollInterval = 500 * time.Millisecond
 )
+
+// WebLogPayload is the payload for the log_url message from the extension.
+type WebLogPayload struct {
+	Url       string `json:"url"`
+	Title     string `json:"title"`
+	VisitTime int64  `json:"visitTime"`
+}
 
 // WebMetadataPayload is the payload for the log_web_metadata message from the extension.
 type WebMetadataPayload struct {
@@ -37,86 +45,101 @@ type Response struct {
 	Payload interface{} `json:"payload"`
 }
 
-// Run starts the native messaging host, which listens for messages from the browser extension.
+// Run starts the native messaging host loop
 func Run() {
-	log := data.GetLogger()
+	// Setup logging to file (CRITICAL for debugging native messaging)
+	cacheDir, _ := os.UserCacheDir()
+	logDir := filepath.Join(cacheDir, "procguard", "logs")
+	os.MkdirAll(logDir, 0755)
 
-	// Start a goroutine to poll the web blocklist and push updates to the extension.
-	go pollWebBlocklist()
-
-	// The main loop reads messages from stdin, which is connected to the browser extension.
-	// CRITICAL: We must check if Stdin is actually a pipe (connected to Chrome).
-	// If we run this when launched by user (double-click), Stdin is invalid and we get infinite loop errors.
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		log.Println("Stdin is a terminal, not a pipe. Skipping native messaging host.")
-		return
+	logPath := filepath.Join(logDir, "native_host.log")
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if logFile != nil {
+		defer logFile.Close()
+		log.SetOutput(logFile)
 	}
 
+	// Catch panics to see why it crashes
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("CRITICAL PANIC in Native Host: %v\nStack: %s", r, string(debug.Stack()))
+		}
+	}()
+
+	log.Println("=== NATIVE MESSAGING HOST STARTED ===")
+
+	// Start blocklist poller (panic safe)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("PANIC in Blocklist Poller: %v", r)
+			}
+		}()
+		pollWebBlocklist()
+	}()
+
+	// Start continuous heartbeat updater
+	// This ensures the GUI knows we are alive even if no messages are flowing
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			updateHeartbeat()
+		}
+	}()
+
+	// Main Message Loop
 	for {
-		// The native messaging protocol prefixes each message with its length in bytes.
+		log.Println("Waiting for message...")
+
+		// 1. Read Message Length (4 bytes)
 		var length uint32
 		if err := binary.Read(os.Stdin, binary.LittleEndian, &length); err != nil {
 			if err == io.EOF {
-				log.Println("EOF received, exiting native messaging host.")
-				break // Exit loop on EOF
-			}
-			// If we get an error here, it likely means Stdin is closed or invalid.
-			// We should exit the loop to avoid spamming logs.
-			log.Printf("Error reading message length: %v. Exiting native messaging loop.", err)
-			break
-		}
-
-		msg := make([]byte, length)
-		if _, err := io.ReadFull(os.Stdin, msg); err != nil {
-			log.Printf("Error reading message body: %v", err)
-			continue
-		}
-
-		var req Request
-		if err := json.Unmarshal(msg, &req); err != nil {
-			log.Printf("Error unmarshalling message: %v", err)
-			continue
-		}
-
-		// Update extension heartbeat (message received = extension is alive)
-		// Write current timestamp to file so GUI process can detect connection
-		go func() {
-			cacheDir, err := os.UserCacheDir()
-			if err != nil {
+				log.Println("Chrome disconnected (EOF)")
 				return
 			}
-			heartbeatPath := filepath.Join(cacheDir, "procguard", "extension_heartbeat")
-			timestamp := fmt.Sprintf("%d", time.Now().Unix())
-			os.WriteFile(heartbeatPath, []byte(timestamp), 0644)
-		}()
+			log.Printf("Error reading length: %v", err)
+			return
+		}
 
-		// Handle the message based on its type.
+		// 2. Read Message Body
+		msg := make([]byte, length)
+		if _, err := io.ReadFull(os.Stdin, msg); err != nil {
+			log.Printf("Error reading body: %v", err)
+			return
+		}
+
+		log.Printf("Received message (%d bytes): %s", length, string(msg))
+
+		// 3. Update Heartbeat File (for GUI detection)
+		updateHeartbeat()
+
+		// 4. Process Message
+		var req Request
+		if err := json.Unmarshal(msg, &req); err != nil {
+			log.Printf("JSON Error: %v", err)
+			continue
+		}
+
+		log.Printf("Processing message type: %s", req.Type)
+
 		switch req.Type {
 		case "ping":
-			var payload string
-			if err := json.Unmarshal(req.Payload, &payload); err != nil {
-				log.Printf("Error unmarshalling ping payload: %v", err)
-				continue
-			}
-			resp := Response{
-				Type:    "echo",
-				Payload: payload,
-			}
-			sendMessage(resp)
-		case "log_url":
-			var url string
-			if err := json.Unmarshal(req.Payload, &url); err != nil {
-				log.Printf("Error unmarshalling log_url payload: %v", err)
-				continue
-			}
-			// Ignore logging the app's own GUI.
-			if strings.HasPrefix(url, "http://127.0.0.1:58141") {
-				continue
-			}
+			sendResponse(map[string]string{"type": "pong"})
 
-			// Log the URL directly to the database
-			data.EnqueueWrite("INSERT INTO web_events (url, timestamp) VALUES (?, ?)", url, time.Now().Unix())
+		case "log_url":
+			// Handle URL logging
+			var payload WebLogPayload
+			if err := json.Unmarshal(req.Payload, &payload); err == nil {
+				log.Printf("Logging URL: %s", payload.Url)
+				// Write to DB
+				if err := data.LogWebActivity(payload.Url, payload.Title, payload.VisitTime); err != nil {
+					log.Printf("DB Error: %v", err)
+				}
+			} else {
+				log.Printf("Error unmarshalling log_url: %v", err)
+			}
 
 		case "log_web_metadata":
 			var payload WebMetadataPayload
@@ -124,22 +147,22 @@ func Run() {
 				log.Printf("Error unmarshalling log_web_metadata payload: %v", err)
 				continue
 			}
-			
+
 			// Log metadata directly to the database
-			data.EnqueueWrite("INSERT OR REPLACE INTO web_metadata (domain, title, icon_url, timestamp) VALUES (?, ?, ?, ?)", 
+			data.EnqueueWrite("INSERT OR REPLACE INTO web_metadata (domain, title, icon_url, timestamp) VALUES (?, ?, ?, ?)",
 				payload.Domain, payload.Title, payload.IconURL, time.Now().Unix())
 
 		case "get_web_blocklist":
-			list, err := data.LoadWebBlocklist()
+			// Send blocklist
+			blocklist, err := data.LoadWebBlocklist()
 			if err != nil {
-				log.Printf("Error loading web blocklist: %v", err)
-				continue
+				log.Printf("Error loading blocklist: %v", err)
+				blocklist = []string{} // Send empty list on error
 			}
-			resp := Response{
-				Type:    "web_blocklist",
-				Payload: list,
-			}
-			sendMessage(resp)
+			sendResponse(map[string]interface{}{
+				"type":    "web_blocklist",
+				"payload": blocklist,
+			})
 		case "add_to_web_blocklist":
 			var domain string
 			if err := json.Unmarshal(req.Payload, &domain); err != nil {
@@ -150,14 +173,15 @@ func Run() {
 				log.Printf("Error adding to web blocklist: %v", err)
 			}
 		default:
-			// Optionally handle unknown message types.
+			log.Printf("Unknown message type: %s", req.Type)
 		}
+
+		log.Println("Message processed successfully")
 	}
 }
 
 // pollWebBlocklist periodically checks for changes in the web blocklist and sends updates to the extension.
 func pollWebBlocklist() {
-	log := data.GetLogger()
 	var lastBlocklist []string
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -173,41 +197,37 @@ func pollWebBlocklist() {
 		// Only send an update if the blocklist has changed.
 		if !reflect.DeepEqual(list, lastBlocklist) {
 			lastBlocklist = list
-			resp := Response{
-				Type:    "web_blocklist",
-				Payload: list,
-			}
-			sendMessage(resp)
+			sendResponse(map[string]interface{}{
+				"type":    "web_blocklist",
+				"payload": list,
+			})
 		}
 	}
 }
 
 // Stop sends a stopping message to the extension to prevent it from reconnecting.
 func Stop() {
-	sendMessage(Response{
-		Type:    "stopping",
-		Payload: nil,
+	sendResponse(map[string]interface{}{
+		"type":    "stopping",
+		"payload": nil,
 	})
 }
 
-// sendMessage sends a message to the browser extension.
-func sendMessage(resp Response) {
-	log := data.GetLogger()
-	b, err := json.Marshal(resp)
+func updateHeartbeat() {
+	cacheDir, err := os.UserCacheDir()
 	if err != nil {
-		log.Printf("Error marshalling response: %v", err)
 		return
 	}
+	heartbeatPath := filepath.Join(cacheDir, "procguard", "extension_heartbeat")
+	// Ensure directory exists
+	os.MkdirAll(filepath.Dir(heartbeatPath), 0755)
 
-	// The native messaging protocol requires that the message length be sent first.
-	if err := binary.Write(os.Stdout, binary.LittleEndian, uint32(len(b))); err != nil {
-		log.Printf("Error writing message length: %v", err)
-		return
-	}
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	os.WriteFile(heartbeatPath, []byte(timestamp), 0644)
+}
 
-	// Then, the message body is sent.
-	if _, err := os.Stdout.Write(b); err != nil {
-		log.Printf("Error writing message body: %v", err)
-		return
-	}
+func sendResponse(msg interface{}) {
+	bytes, _ := json.Marshal(msg)
+	binary.Write(os.Stdout, binary.LittleEndian, uint32(len(bytes)))
+	os.Stdout.Write(bytes)
 }

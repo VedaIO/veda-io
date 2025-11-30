@@ -70,3 +70,20 @@ func GetWebLogs(db *sql.DB, query, since, until string) ([][]string, error) {
 
 	return entries, nil
 }
+
+// LogWebActivity records a visited URL in the database.
+func LogWebActivity(url, title string, visitTime int64) error {
+	db := GetDB()
+	if db == nil {
+		return nil // Or error if strict
+	}
+
+	// If visitTime is 0, use current time
+	if visitTime == 0 {
+		visitTime = time.Now().Unix()
+	}
+
+	query := "INSERT INTO web_events (url, timestamp) VALUES (?, ?)"
+	_, err := db.Exec(query, url, visitTime)
+	return err
+}

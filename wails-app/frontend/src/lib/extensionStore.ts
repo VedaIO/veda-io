@@ -1,67 +1,74 @@
 import { writable } from 'svelte/store';
 
-export const isExtensionInstalled = writable<boolean | null>(null);
+export const isExtensionInstalled = writable(false);
 
-let pollingInterval: any;
+let pollInterval: number | null = null;
 
-export async function checkExtension(): Promise<void> {
-  // Initial check
-  await performCheck();
-
-  // Start polling if not installed
-  // This handles the case where the extension connects later (Native Messaging)
-  if (pollingInterval) clearInterval(pollingInterval);
-  pollingInterval = setInterval(async () => {
-    const installed = await performCheck();
-    if (installed) {
-      clearInterval(pollingInterval);
-    }
-  }, 2000); // Check every 2 seconds
-}
-
-async function performCheck(): Promise<boolean> {
+/**
+ * Check if extension is installed/connected
+ * Simple heartbeat check - no events, no complexity
+ */
+export async function checkExtension() {
   try {
-    // Use Wails backend method to check if extension is installed
     const installed = await window.go.main.App.CheckChromeExtension();
-    console.log('Extension check result:', installed);
+    isExtensionInstalled.set(installed);
 
-    if (installed) {
-      isExtensionInstalled.set(true);
-
-      // Register with backend
-      // We register both the Store ID and the Dev ID to be safe
-      const storeExtensionId = 'hkanepohpflociaodcicmmfbdaohpceo';
-      const devExtensionId = 'gpaafgcbiejjpfdgmjglehboafdicdjb';
-
-      try {
-        await window.go.main.App.RegisterExtension(storeExtensionId);
-        await window.go.main.App.RegisterExtension(devExtensionId);
-        console.log('Extensions registered with backend');
-      } catch (err) {
-        console.error('Failed to register extension:', err);
-      }
-      return true;
+    if (!installed) {
+      // Not connected, start polling if not already
+      startPolling();
     } else {
-      isExtensionInstalled.set(false);
-      return false;
+      // Connected! But keep polling to detect disconnects
+      startPolling();
     }
   } catch (error) {
     console.error('Error checking extension:', error);
     isExtensionInstalled.set(false);
-    return false;
+    startPolling();
   }
 }
 
-// Listen for extension connection event from backend
-// We expose this setup function to be called from onMount
-export function setupExtensionListener() {
-  if (window.runtime) {
-    window.runtime.EventsOn('extension_connected', (connected: boolean) => {
-      console.log('Extension connected event received:', connected);
-      if (connected) {
-        isExtensionInstalled.set(true);
-        if (pollingInterval) clearInterval(pollingInterval);
-      }
-    });
+/**
+ * Start polling for extension status
+ * Checks every 3 seconds
+ */
+function startPolling() {
+  if (pollInterval !== null) {
+    return; // Already polling
+  }
+
+  pollInterval = setInterval(async () => {
+    try {
+      const installed = await window.go.main.App.CheckChromeExtension();
+      isExtensionInstalled.set(installed);
+    } catch (error) {
+      console.error('Polling error:', error);
+      isExtensionInstalled.set(false);
+    }
+  }, 3000); // Check every 3 seconds
+}
+
+/**
+ * Stop polling (cleanup)
+ */
+export function stopPolling() {
+  if (pollInterval !== null) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
+/**
+ * Register the extension with backend
+ * Creates native-host.json manifest
+ */
+export async function registerExtension() {
+  try {
+    await window.go.main.App.RegisterExtension('hkanepohpflociaodcicmmfbdaohpceo');
+    await window.go.main.App.RegisterExtension('gpaafgcbiejjpfdgmjglehboafdicdjb');
+    console.log('Extension registered');
+    // Force immediate re-check
+    await checkExtension();
+  } catch (error) {
+    console.error('Error registering extension:', error);
   }
 }

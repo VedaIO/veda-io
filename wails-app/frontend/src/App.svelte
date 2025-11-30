@@ -23,7 +23,7 @@
     '/login': Login,
   };
 
-  import { checkExtension, setupExtensionListener } from './lib/extensionStore';
+  import { checkExtension } from './lib/extensionStore';
 
   /**
    * Handle stopping the ProcGuard daemon completely
@@ -62,14 +62,10 @@
 
   /**
    * Check authentication status and extension on mount
-   * Extension check has been moved to only run once on startup
-   * to avoid repeatedly calling ShowWindow() which brings window to front
+   * Extension polling starts automatically
    */
   onMount(async () => {
-    // Setup event listener for extension connection
-    setupExtensionListener();
-    
-    // Check extension status (starts polling if not found)
+    // Check extension status (starts polling automatically)
     checkExtension();
     
     // Check if user is authenticated
