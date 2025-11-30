@@ -16,7 +16,7 @@ import (
 const (
 	// HostName is the name of the native messaging host.
 	// It must match the name specified in the browser extension's manifest.
-	HostName = "com.nixuris.procguard"
+	HostName = "com.infraflakes.procguard"
 )
 
 // InstallNativeHost sets up the native messaging host for Chrome by creating a registry key

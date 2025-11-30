@@ -20,7 +20,7 @@ import (
 )
 
 const appName = "ProcGuard"
-const hostName = "com.nixuris.procguard"
+const hostName = "com.infraflakes.procguard"
 
 // Uninstall handles the uninstallation of the application.
 // It performs a series of cleanup tasks in a separate goroutine and then initiates a self-deletion process.

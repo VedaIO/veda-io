@@ -1,4 +1,4 @@
-const hostName = 'com.nixuris.procguard';
+const hostName = 'com.infraflakes.procguard';
 let port;
 let webBlocklist = [];
 let isPortConnected = false;
