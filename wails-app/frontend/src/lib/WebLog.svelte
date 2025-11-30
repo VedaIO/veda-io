@@ -27,12 +27,15 @@
     sinceStr: string,
     untilStr: string
   ): Promise<void> {
+    console.log('loadWebLogs called with:', { query, sinceStr, untilStr });
     try {
       const data = await window.go.main.App.GetWebLogs(
         query,
         sinceStr,
         untilStr
       );
+      console.log('GetWebLogs returned:', data);
+      
       if (data && data.length > 0) {
         const items: WebLogItem[] = await Promise.all(
           data.map(async (l: string[]) => {
@@ -69,8 +72,10 @@
             };
           })
         );
+        console.log('Processed items:', items);
         webLogItems.set(items);
       } else {
+        console.log('No data returned');
         webLogItems.set([]);
       }
     } catch (error) {

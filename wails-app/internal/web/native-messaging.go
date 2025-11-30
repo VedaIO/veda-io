@@ -59,6 +59,14 @@ func Run() {
 		log.SetOutput(logFile)
 	}
 
+	// Initialize Database (CRITICAL: Required for logging)
+	if _, err := data.InitDB(); err != nil {
+		log.Printf("CRITICAL: Failed to initialize database: %v", err)
+		// We continue anyway, but DB writes will fail
+	} else {
+		log.Println("Database initialized successfully")
+	}
+
 	// Catch panics to see why it crashes
 	defer func() {
 		if r := recover(); r != nil {
@@ -131,14 +139,15 @@ func Run() {
 		case "log_url":
 			// Handle URL logging
 			var payload WebLogPayload
-			if err := json.Unmarshal(req.Payload, &payload); err == nil {
-				log.Printf("Logging URL: %s", payload.Url)
-				// Write to DB
-				if err := data.LogWebActivity(payload.Url, payload.Title, payload.VisitTime); err != nil {
-					log.Printf("DB Error: %v", err)
-				}
-			} else {
+			if err := json.Unmarshal(req.Payload, &payload); err != nil {
 				log.Printf("Error unmarshalling log_url: %v", err)
+				continue
+			}
+
+			log.Printf("Logging URL: %s", payload.Url)
+			// Write to DB
+			if err := data.LogWebActivity(payload.Url, payload.Title, payload.VisitTime); err != nil {
+				log.Printf("DB Error: %v", err)
 			}
 
 		case "log_web_metadata":

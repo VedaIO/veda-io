@@ -124,7 +124,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Only log when the tab is fully loaded and has a valid URL.
   if (changeInfo.status === 'complete' && tab.url && (tab.url.startsWith('http') || tab.url.startsWith('https'))) {
     if (port && isPortConnected) {
-      port.postMessage({ type: 'log_url', payload: tab.url });
+      port.postMessage({
+        type: 'log_url',
+        payload: {
+          url: tab.url,
+          title: tab.title,
+          visitTime: Math.floor(Date.now() / 1000)
+        }
+      });
 
       // Inject a script to get the title and favicon
       chrome.scripting.executeScript({
