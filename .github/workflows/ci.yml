@@ -17,32 +17,17 @@ jobs:
           determinate: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Magic Nix Cache works without FlakeHub - uses GitHub cache automatically
-      - name: Cache Nix store
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      # Cache Go modules separately
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/.local/share/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Run CI pipeline
         run: |
           nix develop --command bash -c '
             set -e
             cd wails-app
             
-            echo "Running linter..."
-            make lint
-            
             echo "Running build..."
             make build
+
+            echo "Running linter..."
+            make lint
             
             echo "Checking frontend format..."
             cd frontend && bun run format-check
