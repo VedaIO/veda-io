@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "ProcGuard",
+  "outputfilename": "ProcGuard",
+  "author": {
+    "name": "infraflakes",
+    "email": "infraflakes@proton.me"
+  },
+  "info": {
+    "productName": "ProcGuard",
+    "companyName": "Nixuris",
+    "copyright": "Copyright (c) 2025 Nixuris",
+    "productVersion": "1.0.0.0"
+  }
+}

@@ -12,11 +12,13 @@ all: build
 build:
 	@echo "Building ProcGuard for windows..."
 	cd frontend && bun run build
+	wails generate module
 	CGO_ENABLED=1 CC="zig cc -target x86_64-windows-gnu" GOOS=windows GOARCH=amd64 go build -tags desktop,production -ldflags="-w -X main.version=$(VERSION) -H windowsgui" -o build/bin/ProcGuard.exe
 
 build-debug:
 	@echo "Building ProcGuard for windows (debug)..."
 	cd frontend && bun run build
+	wails generate module
 	CGO_ENABLED=1 CC="zig cc -target x86_64-windows-gnu" GOOS=windows GOARCH=amd64 go build -tags desktop,production -ldflags="-X main.version=$(VERSION)" -o build/bin/ProcGuard.exe
 
 fmt:
