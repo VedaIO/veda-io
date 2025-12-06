@@ -19,7 +19,7 @@ func GetPublisherName(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error opening file %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	peFile, err := pe.NewFile(file)
 	if err != nil {

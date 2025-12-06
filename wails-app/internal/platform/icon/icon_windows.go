@@ -72,10 +72,10 @@ var (
 )
 
 const (
-	smCXIcon      = 11
-	smCYIcon      = 12
-	dibRGBColors  = 0
-	biRGB         = 0
+	smCXIcon     = 11
+	smCYIcon     = 12
+	dibRGBColors = 0
+	biRGB        = 0
 )
 
 // GetAppIconAsBase64 extracts the first icon from an executable

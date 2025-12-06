@@ -28,13 +28,13 @@ func GetProcessLevel(pid uint32) (uint32, error) {
 		// Ignore errors for processes we can't open
 		return 0, nil
 	}
-	defer windows.Close(h)
+	defer func() { _ = windows.Close(h) }()
 
 	var token windows.Token
 	if err := windows.OpenProcessToken(h, windows.TOKEN_QUERY, &token); err != nil {
 		return 0, fmt.Errorf("could not open process token: %w", err)
 	}
-	defer token.Close()
+	defer func() { _ = token.Close() }()
 
 	// Get the required buffer size
 	var tokenInfoLen uint32
