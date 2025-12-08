@@ -19,9 +19,9 @@
     const secs = seconds % 60;
 
     if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+      return `${hours}h ${minutes}p`;
     } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
+      return `${minutes}p ${secs}s`;
     }
     return `${secs}s`;
   }
