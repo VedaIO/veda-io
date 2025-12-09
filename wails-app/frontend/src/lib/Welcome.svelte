@@ -108,8 +108,11 @@
       </div>
 
       {#if screenTimeData.length > 0}
-        <div class="screen-time-list">
-          {#each screenTimeData.slice(0, 5) as item (item.executablePath)}
+        <div
+          class="screen-time-list"
+          style="max-height: 400px; overflow-y: auto;"
+        >
+          {#each screenTimeData as item (item.executablePath)}
             <div
               class="screen-time-item d-flex align-items-center py-2 border-bottom"
             >

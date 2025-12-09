@@ -99,12 +99,25 @@ func main() {
 
 	app := NewApp()
 
+	// Check for --background flag to start hidden (e.g. from autostart)
+	startHidden := false
+	for _, arg := range os.Args {
+		if arg == "--background" {
+			startHidden = true
+			break
+		}
+	}
+	if startHidden {
+		log.Println("[MODE] Background/Autostart detected - starting hidden")
+	}
+
 	// Create and run the Wails application
 	err := wails.Run(&options.App{
-		Title:     "ProcGuard",
-		Width:     1024,
-		Height:    768,
-		Frameless: true, // Enable frameless mode
+		Title:       "ProcGuard",
+		Width:       1024,
+		Height:      768,
+		Frameless:   true, // Enable frameless mode
+		StartHidden: startHidden,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
