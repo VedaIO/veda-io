@@ -9,10 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "format": "prettier --write .",
-    "format-check": "prettier --check .",
-    "lint": "eslint src/**/*.ts src/**/*.svelte --config eslint.config.js",
-    "lint:fix": "eslint . --ext .js,.svelte --config eslint.config.js --fix"
+    "format": "biome format --write .",
+    "lint:fix": "biome check --write .",
+    "lint": "biome check .",
+    "format-check": "prettier --check ."
   },
   "keywords": [],
   "author": "",
@@ -20,20 +20,11 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6",
     "@tsconfig/svelte": "^5.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.46.2",
-    "eslint": "^9.39.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-svelte": "^3.13.0",
-    "prettier": "^3.0.0",
-    "prettier-plugin-svelte": "^3.0.0",
     "svelte": "^5.0.0",
     "svelte-check": "^3.6.0",
-    "svelte-eslint-parser": "^1.4.0",
     "svelte-preprocess": "^5.0.0",
     "tslib": "^2.6.0",
     "typescript": "^5.0.0",
-    "typescript-eslint": "^8.46.2",
     "vite": "^5.0.0"
   },
   "dependencies": {
