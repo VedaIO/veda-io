@@ -5,7 +5,7 @@ import (
 	"wails-app/internal/app"
 	"wails-app/internal/auth"
 	"wails-app/internal/config"
-	"wails-app/internal/data"
+	"wails-app/internal/data/history"
 	"wails-app/internal/platform/autostart"
 )
 
@@ -41,7 +41,7 @@ func (s *Server) ClearAppHistory(password string) error {
 		return fmt.Errorf("invalid password")
 	}
 
-	data.ClearAppHistory()
+	history.ClearAppHistory()
 
 	// Reset in-memory caches and states in the app logic
 	// This ensures that previously logged applications can be re-logged
@@ -64,6 +64,6 @@ func (s *Server) ClearWebHistory(password string) error {
 		return fmt.Errorf("invalid password")
 	}
 
-	data.ClearWebHistory()
+	history.ClearWebHistory()
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"time"
 	"wails-app/internal/data"
+	"wails-app/internal/data/write"
 	"wails-app/internal/data/query"
 )
 
@@ -159,7 +160,7 @@ func Run() {
 			}
 
 			// Log metadata directly to the database
-			data.EnqueueWrite("INSERT OR REPLACE INTO web_metadata (domain, title, icon_url, timestamp) VALUES (?, ?, ?, ?)",
+			write.EnqueueWrite("INSERT OR REPLACE INTO web_metadata (domain, title, icon_url, timestamp) VALUES (?, ?, ?, ?)",
 				payload.Domain, payload.Title, payload.IconURL, time.Now().Unix())
 
 		case "get_web_blocklist":

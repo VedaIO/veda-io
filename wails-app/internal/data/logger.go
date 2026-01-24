@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"wails-app/internal/data/write"
 )
 
 // Logger defines the interface for the application's logger.
@@ -72,7 +73,7 @@ func (l *multiLogger) write(level, message string) {
 
 	// Then, write to the database.
 	if l.db != nil {
-		EnqueueWrite("INSERT INTO logs (timestamp, level, message) VALUES (?, ?, ?)", time.Now().Unix(), level, message)
+		write.EnqueueWrite("INSERT INTO logs (timestamp, level, message) VALUES (?, ?, ?)", time.Now().Unix(), level, message)
 	}
 }
 

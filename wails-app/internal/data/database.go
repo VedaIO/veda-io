@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"wails-app/internal/data/schema"
+	"wails-app/internal/data/write"
 
 	_ "modernc.org/sqlite"
 )
@@ -16,14 +17,7 @@ import (
 var (
 	globalDB *sql.DB
 	dbOnce   sync.Once
-	writeCh  chan WriteRequest
 )
-
-// WriteRequest represents a request to write to the database.
-type WriteRequest struct {
-	Query string
-	Args  []interface{}
-}
 
 // InitDB initializes the database, creating the necessary tables and indexes if they don't exist.
 // This function should be called once on application startup.
@@ -39,31 +33,12 @@ func InitDB() (*sql.DB, error) {
 			err = fmt.Errorf("could not create schema: %w", err)
 		}
 
-		writeCh = make(chan WriteRequest, 100) // Buffered channel
-		go StartDatabaseWriter(globalDB)
+		go write.StartDatabaseWriter(globalDB)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return globalDB, nil
-}
-
-// StartDatabaseWriter starts a goroutine that listens for write requests on the writeCh channel
-// and executes them sequentially against the database.
-func StartDatabaseWriter(db *sql.DB) {
-	for req := range writeCh {
-		_, err := db.Exec(req.Query, req.Args...)
-		if err != nil {
-			// If we can't write to the DB, log the failure.
-			// We can't use the normal logger here as it might create a deadlock.
-			log.Printf("[ERROR] Failed to execute write request: %v", err)
-		}
-	}
-}
-
-// EnqueueWrite sends a write request to the database writer channel.
-func EnqueueWrite(query string, args ...interface{}) {
-	writeCh <- WriteRequest{Query: query, Args: args}
 }
 
 // OpenDB opens a connection to the SQLite database.

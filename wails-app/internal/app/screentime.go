@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 	"wails-app/internal/data"
+	"wails-app/internal/data/write"
 	"wails-app/internal/platform/screentime"
 
 	"github.com/shirou/gopsutil/v3/process"
@@ -131,7 +132,7 @@ func trackForegroundWindow(appLogger data.Logger, state *ScreenTimeState) {
 		// We insert with 1 second duration to establish the record.
 		now := time.Now().Unix()
 		appLogger.Printf("[Screentime] New window: %s (%s)", exePath, info.Title)
-		data.EnqueueWrite(`
+		write.EnqueueWrite(`
 			INSERT INTO screen_time (executable_path, window_title, timestamp, duration_seconds)
 			VALUES (?, ?, ?, 1)
 		`, exePath, info.Title, now)
@@ -156,7 +157,7 @@ func trackForegroundWindow(appLogger data.Logger, state *ScreenTimeState) {
 // flushScreenTime writes the buffered duration to the database.
 // It updates the most recent record for the given app and title, adding the buffered duration.
 func flushScreenTime(logger data.Logger, exePath, title string, duration int) {
-	data.EnqueueWrite(`
+	write.EnqueueWrite(`
 		UPDATE screen_time 
 		SET duration_seconds = duration_seconds + ?
 		WHERE id = (

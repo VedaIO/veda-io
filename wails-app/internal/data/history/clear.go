@@ -1,11 +1,15 @@
-package data
+package history
+
+import (
+	"wails-app/internal/data/write"
+)
 
 // This file contains functions for clearing history data from the database.
 //
 // DESIGN DECISION:
-// We use EnqueueWrite instead of direct db.Exec to maintain data integrity and avoid
+// We use write.EnqueueWrite instead of direct db.Exec to maintain data integrity and avoid
 // race conditions with the background daemon which is constantly writing to these tables.
-// EnqueueWrite uses a single-writer pattern via a Go channel, ensuring that delete operations
+// write.EnqueueWrite uses a single-writer pattern via a Go channel, ensuring that delete operations
 // are sequenced correctly with incoming log data.
 
 // ClearAppHistory deletes all records related to application usage.
@@ -16,10 +20,10 @@ package data
 // After running this, all application-related leaderboards and history logs will be empty.
 func ClearAppHistory() {
 	// Delete all process event logs
-	EnqueueWrite("DELETE FROM app_events")
+	write.EnqueueWrite("DELETE FROM app_events")
 
 	// Delete all screen time data
-	EnqueueWrite("DELETE FROM screen_time")
+	write.EnqueueWrite("DELETE FROM screen_time")
 
 	// VACUUM is not called here because it is a blocking operation and might be slow.
 	// SQLite will reuse the free space for future inserts.
@@ -33,8 +37,8 @@ func ClearAppHistory() {
 // After running this, all web-related leaderboards and history logs will be empty.
 func ClearWebHistory() {
 	// Delete all website visit logs
-	EnqueueWrite("DELETE FROM web_events")
+	write.EnqueueWrite("DELETE FROM web_events")
 
 	// Delete all cached website metadata (titles, icons)
-	EnqueueWrite("DELETE FROM web_metadata")
+	write.EnqueueWrite("DELETE FROM web_metadata")
 }

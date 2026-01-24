@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"wails-app/internal/data"
+	"wails-app/internal/data/write"
 	"wails-app/internal/platform/executable"
 	"wails-app/internal/platform/integrity"
 	"wails-app/internal/platform/window"
@@ -73,7 +74,7 @@ func StartProcessEventLogger(appLogger data.Logger, db *sql.DB) {
 func logEndedProcesses(appLogger data.Logger, db *sql.DB, runningProcs, currentProcs map[int32]bool) {
 	for pid := range runningProcs {
 		if !currentProcs[pid] {
-			data.EnqueueWrite("UPDATE app_events SET end_time = ? WHERE pid = ? AND end_time IS NULL", time.Now().Unix(), pid)
+			write.EnqueueWrite("UPDATE app_events SET end_time = ? WHERE pid = ? AND end_time IS NULL", time.Now().Unix(), pid)
 			delete(runningProcs, pid)
 		}
 	}
@@ -101,7 +102,7 @@ func logNewProcesses(appLogger data.Logger, db *sql.DB, runningProcs map[int32]b
 				if err != nil {
 					appLogger.Printf("Failed to get exe path for %s (pid %d): %v", name, p.Pid, err)
 				}
-				data.EnqueueWrite("INSERT INTO app_events (process_name, pid, parent_process_name, exe_path, start_time) VALUES (?, ?, ?, ?, ?)",
+				write.EnqueueWrite("INSERT INTO app_events (process_name, pid, parent_process_name, exe_path, start_time) VALUES (?, ?, ?, ?, ?)",
 					name, p.Pid, parentName, exePath, time.Now().Unix())
 				runningProcs[p.Pid] = true
 			}
@@ -126,7 +127,7 @@ func initializeRunningProcs(runningProcs map[int32]bool, db *sql.DB) {
 			if exists, _ := process.PidExists(pid); exists {
 				runningProcs[pid] = true
 			} else {
-				data.EnqueueWrite("UPDATE app_events SET end_time = ? WHERE pid = ? AND end_time IS NULL", time.Now().Unix(), pid)
+				write.EnqueueWrite("UPDATE app_events SET end_time = ? WHERE pid = ? AND end_time IS NULL", time.Now().Unix(), pid)
 			}
 		}
 	}
