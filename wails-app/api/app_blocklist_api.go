@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"wails-app/internal/app"
+	"wails-app/internal/blocklist/app"
 )
 
 // BlockApps adds one or more applications to the blocklist.

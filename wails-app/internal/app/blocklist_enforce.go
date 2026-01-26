@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"wails-app/internal/blocklist/app"
 	"wails-app/internal/data/logger"
 
 	"github.com/shirou/gopsutil/v3/process"
@@ -18,7 +19,7 @@ func StartBlocklistEnforcer(appLogger logger.Logger) {
 		killTick := time.NewTicker(blocklistEnforceInterval)
 		defer killTick.Stop()
 		for range killTick.C {
-			list, err := LoadAppBlocklist()
+			list, err := app.LoadAppBlocklist()
 			if err != nil {
 				appLogger.Printf("failed to fetch blocklist: %v", err)
 				continue
