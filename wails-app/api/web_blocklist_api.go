@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"time"
+	"wails-app/internal/blocklist/web"
 	"wails-app/internal/data/query"
-	"wails-app/internal/web"
 )
 
 // GetWebBlocklist returns the list of blocked websites with their details.

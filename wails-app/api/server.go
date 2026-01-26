@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"sync"
 	"wails-app/internal/data/logger"
+	"wails-app/internal/data/query"
 	"wails-app/internal/platform/executable"
 	"wails-app/internal/platform/icon"
 	"wails-app/internal/platform/nativehost"
-	"wails-app/internal/web"
 )
 
 // Server holds the dependencies for the API server, such as the database connection and the logger.
@@ -47,15 +47,15 @@ func (s *Server) GetAppDetails(exePath string) (AppDetailsResponse, error) {
 }
 
 // GetWebDetails retrieves metadata for a given domain.
-func (s *Server) GetWebDetails(domain string) (web.WebMetadata, error) {
-	meta, err := web.GetWebMetadata(s.db, domain)
+func (s *Server) GetWebDetails(domain string) (query.WebMetadata, error) {
+	meta, err := query.GetWebMetadata(s.db, domain)
 	if err != nil {
-		return web.WebMetadata{}, err
+		return query.WebMetadata{}, err
 	}
 
 	if meta == nil {
 		// If no metadata is found, return an empty response.
-		return web.WebMetadata{Domain: domain}, nil
+		return query.WebMetadata{Domain: domain}, nil
 	}
 
 	return *meta, nil

@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"time"
+	blocklist "wails-app/internal/blocklist/web"
 	"wails-app/internal/data"
 	"wails-app/internal/data/query"
 	"wails-app/internal/data/write"
@@ -165,14 +166,14 @@ func Run() {
 
 		case "get_web_blocklist":
 			// Send blocklist
-			blocklist, err := LoadWebBlocklist()
+			bl, err := blocklist.LoadWebBlocklist()
 			if err != nil {
 				log.Printf("Error loading blocklist: %v", err)
-				blocklist = []string{} // Send empty list on error
+				bl = []string{} // Send empty list on error
 			}
 			sendResponse(map[string]interface{}{
 				"type":    "web_blocklist",
-				"payload": blocklist,
+				"payload": bl,
 			})
 		case "add_to_web_blocklist":
 			var domain string
@@ -180,7 +181,7 @@ func Run() {
 				log.Printf("Error unmarshalling add_to_web_blocklist payload: %v", err)
 				continue
 			}
-			if _, err := AddWebsiteToBlocklist(domain); err != nil {
+			if _, err := blocklist.AddWebsiteToBlocklist(domain); err != nil {
 				log.Printf("Error adding to web blocklist: %v", err)
 			}
 		default:
@@ -199,7 +200,7 @@ func pollWebBlocklist() {
 
 	for range ticker.C {
 		// Load blocklist directly from data package
-		list, err := LoadWebBlocklist()
+		list, err := blocklist.LoadWebBlocklist()
 		if err != nil {
 			log.Printf("Failed to get web blocklist: %v", err)
 			continue

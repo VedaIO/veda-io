@@ -3,7 +3,6 @@ package api
 import (
 	"time"
 	"wails-app/internal/data/query"
-	"wails-app/internal/web"
 )
 
 // AppLeaderboardItem represents a single item in the application leaderboard.
@@ -174,7 +173,7 @@ func (s *Server) getWebLeaderboard(since, until string) ([]WebLeaderboardItem, e
 		}
 
 		// Enrich with metadata
-		if meta, err := web.GetWebMetadata(s.db, item.Domain); err == nil && meta != nil {
+		if meta, err := query.GetWebMetadata(s.db, item.Domain); err == nil && meta != nil {
 			item.Title = meta.Title
 			item.Icon = meta.IconURL
 		}

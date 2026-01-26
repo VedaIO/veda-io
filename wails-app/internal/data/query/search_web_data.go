@@ -89,3 +89,24 @@ func LogWebActivity(url, title string, visitTime int64) error {
 	_, err := db.Exec(query, url, visitTime)
 	return err
 }
+
+// WebMetadata holds the cached metadata for a website, such as its title and icon URL.
+type WebMetadata struct {
+	Domain    string `json:"domain"`
+	Title     string `json:"title"`
+	IconURL   string `json:"iconUrl"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// GetWebMetadata retrieves the cached metadata for a given domain from the database.
+func GetWebMetadata(db *sql.DB, domain string) (*WebMetadata, error) {
+	var meta WebMetadata
+	err := db.QueryRow("SELECT domain, title, icon_url, timestamp FROM web_metadata WHERE domain = ?", domain).Scan(&meta.Domain, &meta.Title, &meta.IconURL, &meta.Timestamp)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &meta, nil
+}
