@@ -1,11 +1,11 @@
-package app
+package screentime
 
 import (
 	"database/sql"
 	"time"
 	"wails-app/internal/data/logger"
 	"wails-app/internal/data/write"
-	"wails-app/internal/platform/screentime"
+	platformScreentime "wails-app/internal/platform/screentime"
 
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -16,28 +16,6 @@ const (
 	// dbFlushInterval determines how often we flush buffered screen time data to the database.
 	dbFlushInterval = 10 * time.Second
 )
-
-// CachedProcInfo stores the executable path and creation time of a process.
-// We use the Creation Time to validate that a PID hasn't been reused.
-type CachedProcInfo struct {
-	ExePath      string
-	CreationTime int64 // Unix timestamp in milliseconds
-}
-
-// ScreenTimeState maintains the state of the screen time monitoring loop.
-// It buffers database writes and caches process information to improve performance.
-type ScreenTimeState struct {
-	// lastExePath is the executable path of the previously detected foreground window.
-	lastExePath string
-	// lastTitle is the title of the previously detected foreground window.
-	lastTitle string
-	// pendingDuration is the number of seconds the current window has been active since the last DB flush.
-	pendingDuration int
-	// lastFlushTime is the timestamp of the last successful database flush.
-	lastFlushTime time.Time
-	// exeCache maps Process IDs (PID) to their cached info (path + validation data).
-	exeCache map[uint32]CachedProcInfo
-}
 
 var resetScreenTimeCh = make(chan struct{}, 1)
 
@@ -52,8 +30,8 @@ func ResetScreenTime() {
 func StartScreenTimeMonitor(appLogger logger.Logger, db *sql.DB) {
 	go func() {
 		state := &ScreenTimeState{
-			lastFlushTime: time.Now(),
-			exeCache:      make(map[uint32]CachedProcInfo),
+			LastFlushTime: time.Now(),
+			ExeCache:      make(map[uint32]CachedProcInfo),
 		}
 		ticker := time.NewTicker(screenTimeCheckInterval)
 		defer ticker.Stop()
@@ -64,10 +42,10 @@ func StartScreenTimeMonitor(appLogger logger.Logger, db *sql.DB) {
 				trackForegroundWindow(appLogger, state)
 			case <-resetScreenTimeCh:
 				appLogger.Printf("[Screentime] Reset signal received. Clearing in-memory state.")
-				state.lastExePath = ""
-				state.lastTitle = ""
-				state.pendingDuration = 0
-				state.exeCache = make(map[uint32]CachedProcInfo)
+				state.LastExePath = ""
+				state.LastTitle = ""
+				state.PendingDuration = 0
+				state.ExeCache = make(map[uint32]CachedProcInfo)
 			}
 		}
 	}()
@@ -76,7 +54,7 @@ func StartScreenTimeMonitor(appLogger logger.Logger, db *sql.DB) {
 // trackForegroundWindow performs a single check of the active window and updates the state.
 func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 	// Retrieve the active window information from the platform-specific implementation.
-	info := screentime.GetActiveWindowInfo()
+	info := platformScreentime.GetActiveWindowInfo()
 	if info == nil || info.PID == 0 {
 		return
 	}
@@ -89,7 +67,7 @@ func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 		createTime, err := proc.CreateTime()
 		if err == nil {
 			// Check cache
-			cached, ok := state.exeCache[info.PID]
+			cached, ok := state.ExeCache[info.PID]
 			if ok && cached.CreationTime == createTime {
 				// Cache hit and validated!
 				exePath = cached.ExePath
@@ -98,11 +76,10 @@ func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 				path, err := proc.Exe()
 				if err == nil {
 					exePath = path
-					state.exeCache[info.PID] = CachedProcInfo{
+					state.ExeCache[info.PID] = CachedProcInfo{
 						ExePath:      path,
 						CreationTime: createTime,
 					}
-					// appLogger.Printf("[Perf] Cached PID %d -> %s", info.PID, path) // Too verbose?
 				}
 			}
 		}
@@ -119,13 +96,13 @@ func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 	}
 
 	// Check if the user is still in the same window as the last check.
-	if exePath == state.lastExePath && info.Title == state.lastTitle {
+	if exePath == state.LastExePath && info.Title == state.LastTitle {
 		// Same window: increment the memory buffer. We don't write to DB yet.
-		state.pendingDuration++
+		state.PendingDuration++
 	} else {
 		// Window changed: we must flush the accumulated time for the *previous* window.
-		if state.pendingDuration > 0 {
-			flushScreenTime(appLogger, state.lastExePath, state.lastTitle, state.pendingDuration)
+		if state.PendingDuration > 0 {
+			flushScreenTime(appLogger, state.LastExePath, state.LastTitle, state.PendingDuration)
 		}
 
 		// Insert a new record for the *new* window session.
@@ -138,32 +115,18 @@ func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 		`, exePath, info.Title, now)
 
 		// Update our state to reflect the new active window.
-		state.lastExePath = exePath
-		state.lastTitle = info.Title
-		state.pendingDuration = 0 // Duration is 0 because we just inserted 1s in the DB.
+		state.LastExePath = exePath
+		state.LastTitle = info.Title
+		state.PendingDuration = 0 // Duration is 0 because we just inserted 1s in the DB.
 	}
 
 	// Periodically flush the buffer to the DB, even if the window hasn't changed.
 	// This ensures the UI shows relatively up-to-date data during long sessions in one app.
-	if time.Since(state.lastFlushTime) >= dbFlushInterval {
-		if state.pendingDuration > 0 {
-			flushScreenTime(appLogger, state.lastExePath, state.lastTitle, state.pendingDuration)
-			state.pendingDuration = 0 // Reset buffer after flush.
+	if time.Since(state.LastFlushTime) >= dbFlushInterval {
+		if state.PendingDuration > 0 {
+			flushScreenTime(appLogger, state.LastExePath, state.LastTitle, state.PendingDuration)
+			state.PendingDuration = 0 // Reset buffer after flush.
 		}
-		state.lastFlushTime = time.Now()
+		state.LastFlushTime = time.Now()
 	}
-}
-
-// flushScreenTime writes the buffered duration to the database.
-// It updates the most recent record for the given app and title, adding the buffered duration.
-func flushScreenTime(l logger.Logger, exePath, title string, duration int) {
-	write.EnqueueWrite(`
-		UPDATE screen_time 
-		SET duration_seconds = duration_seconds + ?
-		WHERE id = (
-			SELECT id FROM screen_time 
-			WHERE executable_path = ? AND window_title = ?
-			ORDER BY timestamp DESC LIMIT 1
-		)
-	`, duration, exePath, title)
 }

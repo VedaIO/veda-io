@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"wails-app/internal/app"
+	"wails-app/internal/app/screentime"
 	"wails-app/internal/auth"
 	"wails-app/internal/config"
 	"wails-app/internal/data/history"
@@ -47,7 +48,7 @@ func (s *Server) ClearAppHistory(password string) error {
 	// This ensures that previously logged applications can be re-logged
 	// and screen time tracking starts fresh.
 	app.ResetLoggedApps()
-	app.ResetScreenTime()
+	screentime.ResetScreenTime()
 
 	return nil
 }

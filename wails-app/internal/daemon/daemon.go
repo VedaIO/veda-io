@@ -3,6 +3,7 @@ package daemon
 import (
 	"database/sql"
 	"wails-app/internal/app"
+	"wails-app/internal/app/screentime"
 	"wails-app/internal/data/logger"
 	"wails-app/internal/platform/autostart"
 )
@@ -20,5 +21,5 @@ func Start(appLogger logger.Logger, db *sql.DB) {
 	app.StartBlocklistEnforcer(appLogger)
 
 	// Start the screen time monitor to track foreground window usage.
-	app.StartScreenTimeMonitor(appLogger, db)
+	screentime.StartScreenTimeMonitor(appLogger, db)
 }
