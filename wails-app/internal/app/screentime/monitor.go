@@ -6,9 +6,8 @@ import (
 	"wails-app/internal/data/logger"
 	"wails-app/internal/data/write"
 	"wails-app/internal/platform/app_filter"
+	"wails-app/internal/platform/proc_sensing"
 	platformScreentime "wails-app/internal/platform/screentime"
-
-	"github.com/shirou/gopsutil/v3/process"
 )
 
 const (
@@ -32,7 +31,7 @@ func StartScreenTimeMonitor(appLogger logger.Logger, db *sql.DB) {
 	go func() {
 		state := &ScreenTimeState{
 			LastFlushTime: time.Now(),
-			ExeCache:      make(map[uint32]CachedProcInfo),
+			ExeCache:      make(map[string]CachedProcInfo),
 		}
 		ticker := time.NewTicker(screenTimeCheckInterval)
 		defer ticker.Stop()
@@ -43,10 +42,11 @@ func StartScreenTimeMonitor(appLogger logger.Logger, db *sql.DB) {
 				trackForegroundWindow(appLogger, state)
 			case <-resetScreenTimeCh:
 				appLogger.Printf("[Screentime] Reset signal received. Clearing in-memory state.")
+				state.LastUniqueKey = ""
 				state.LastExePath = ""
 				state.LastTitle = ""
 				state.PendingDuration = 0
-				state.ExeCache = make(map[uint32]CachedProcInfo)
+				state.ExeCache = make(map[string]CachedProcInfo)
 			}
 		}
 	}()
@@ -60,48 +60,41 @@ func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 		return
 	}
 
-	exePath := ""
+	// Resolve the PID to a specific process instance using our sensing layer.
+	// This ensures we have the correct ExePath and unique key (PID-StartTime).
+	procs, err := proc_sensing.GetAllProcesses()
+	if err != nil {
+		return
+	}
 
-	// Get process object to check creation time for validation
-	proc, err := process.NewProcess(int32(info.PID))
-	if err == nil {
-		createTime, err := proc.CreateTime()
-		if err == nil {
-			// Check cache
-			cached, ok := state.ExeCache[info.PID]
-			if ok && cached.CreationTime == createTime {
-				// Cache hit and validated!
-				exePath = cached.ExePath
-			} else {
-				// Cache miss or obsolete PID. Resolve path.
-				path, err := proc.Exe()
-				if err == nil {
-					exePath = path
-					state.ExeCache[info.PID] = CachedProcInfo{
-						ExePath:      path,
-						CreationTime: createTime,
-					}
-				}
-			}
+	var activeProc *proc_sensing.ProcessInfo
+	for _, p := range procs {
+		if p.PID == info.PID {
+			activeProc = &p
+			break
 		}
 	}
 
-	if exePath == "" {
-		// Fallback if we couldn't get creation time or process info (rare race condition or permission issue)
-		return
+	if activeProc == nil {
+		return // Focused process exited or is inaccessible
 	}
+
+	uniqueKey := activeProc.UniqueKey()
+	exePath := activeProc.ExePath
 
 	// Filter out applications that should not be tracked (e.g., system services).
-	if app_filter.ShouldExclude(exePath, proc) {
+	if app_filter.ShouldExclude(exePath, activeProc) {
 		return
 	}
 
-	// Check if the user is still in the same window as the last check.
-	if exePath == state.LastExePath && info.Title == state.LastTitle {
+	// Check if the user is still in the same window AND same process instance as the last check.
+	// This definitively handles PID recycling.
+	if uniqueKey == state.LastUniqueKey && info.Title == state.LastTitle {
 		// Same window: increment the memory buffer. We don't write to DB yet.
 		state.PendingDuration++
 	} else {
-		// Window changed: we must flush the accumulated time for the *previous* window.
+		// Window changed (either app, title, or process instance):
+		// flush the accumulated time for the *previous* window.
 		if state.PendingDuration > 0 {
 			flushScreenTime(appLogger, state.LastExePath, state.LastTitle, state.PendingDuration)
 		}
@@ -116,6 +109,7 @@ func trackForegroundWindow(appLogger logger.Logger, state *ScreenTimeState) {
 		`, exePath, info.Title, now)
 
 		// Update our state to reflect the new active window.
+		state.LastUniqueKey = uniqueKey
 		state.LastExePath = exePath
 		state.LastTitle = info.Title
 		state.PendingDuration = 0 // Duration is 0 because we just inserted 1s in the DB.

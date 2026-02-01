@@ -10,9 +10,8 @@ import (
 	"wails-app/internal/data/logger"
 	"wails-app/internal/platform/autostart"
 	"wails-app/internal/platform/nativehost"
+	"wails-app/internal/platform/proc_sensing"
 	"wails-app/internal/platform/uninstall"
-
-	"github.com/shirou/gopsutil/v3/process"
 )
 
 const appName = "ProcGuard"
@@ -68,24 +67,22 @@ func (s *Server) Uninstall(password string) error {
 // killOtherProcGuardProcesses finds and terminates any other running ProcGuard processes.
 func killOtherProcGuardProcesses(logger logger.Logger) {
 	currentPid := os.Getpid()
-	procs, err := process.Processes()
+	procs, err := proc_sensing.GetAllProcesses()
 	if err != nil {
 		return
 	}
 
 	for _, p := range procs {
-		if p.Pid == int32(currentPid) {
+		if int(p.PID) == currentPid {
 			continue
 		}
 
-		name, err := p.Name()
-		if err != nil {
-			continue
-		}
-
-		if strings.HasPrefix(strings.ToLower(name), "procguard") {
-			if err := p.Kill(); err != nil {
-				logger.Printf("Failed to kill process %s: %v", name, err)
+		if strings.HasPrefix(strings.ToLower(p.Name), "procguard") {
+			osProc, err := os.FindProcess(int(p.PID))
+			if err == nil {
+				if err := osProc.Kill(); err != nil {
+					logger.Printf("Failed to kill process %s (%d): %v", p.Name, p.PID, err)
+				}
 			}
 		}
 	}

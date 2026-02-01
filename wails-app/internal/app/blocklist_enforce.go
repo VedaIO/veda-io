@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"os"
 	"wails-app/internal/blocklist/app"
 	"wails-app/internal/data/logger"
-
-	"github.com/shirou/gopsutil/v3/process"
+	"wails-app/internal/platform/proc_sensing"
 )
 
 const blocklistEnforceInterval = 2 * time.Second
@@ -27,26 +27,29 @@ func StartBlocklistEnforcer(appLogger logger.Logger) {
 			if len(list) == 0 {
 				continue
 			}
-			procs, err := process.Processes()
+			procs, err := proc_sensing.GetAllProcesses()
 			if err != nil {
 				appLogger.Printf("Failed to get processes: %v", err)
 				continue
 			}
 			for _, p := range procs {
-				name, _ := p.Name()
+				name := p.Name
 				if name == "" {
 					continue
 				}
 
 				if slices.Contains(list, strings.ToLower(name)) {
-					err := p.Kill()
-					if err != nil {
-						appLogger.Printf("failed to kill %s (pid %d): %v", name, p.Pid, err)
-					} else {
-						appLogger.Printf("killed blocked process %s (pid %d)", name, p.Pid)
+					osProc, err := os.FindProcess(int(p.PID))
+					if err == nil {
+						if err := osProc.Kill(); err != nil {
+							appLogger.Printf("failed to kill %s (pid %d): %v", name, p.PID, err)
+						} else {
+							appLogger.Printf("killed blocked process %s (pid %d)", name, p.PID)
+						}
 					}
 				}
 			}
+
 		}
 	}()
 }

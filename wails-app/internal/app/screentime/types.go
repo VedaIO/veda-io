@@ -5,15 +5,16 @@ import (
 )
 
 // CachedProcInfo stores the executable path and creation time of a process.
-// We use the Creation Time to validate that a PID hasn't been reused.
 type CachedProcInfo struct {
-	ExePath      string
-	CreationTime int64 // Unix timestamp in milliseconds
+	ExePath       string
+	StartTimeNano uint64
 }
 
 // ScreenTimeState maintains the state of the screen time monitoring loop.
 // It buffers database writes and caches process information to improve performance.
 type ScreenTimeState struct {
+	// LastUniqueKey is the unique identifier (PID-StartTime) of the previously detected process.
+	LastUniqueKey string
 	// lastExePath is the executable path of the previously detected foreground window.
 	LastExePath string
 	// lastTitle is the title of the previously detected foreground window.
@@ -22,6 +23,6 @@ type ScreenTimeState struct {
 	PendingDuration int
 	// lastFlushTime is the timestamp of the last successful database flush.
 	LastFlushTime time.Time
-	// exeCache maps Process IDs (PID) to their cached info (path + validation data).
-	ExeCache map[uint32]CachedProcInfo
+	// ExeCache maps unique process keys (PID-StartTime) to their cached info (path + validation data).
+	ExeCache map[string]CachedProcInfo
 }
