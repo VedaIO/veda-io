@@ -4,38 +4,7 @@
 package screentime
 
 /*
-#include <windows.h>
-#include <stdint.h>
-
-typedef struct {
-    uint32_t pid;
-    wchar_t title[256];
-} ActiveWindowInfo;
-
-int GetActiveWindowInfo(ActiveWindowInfo* info) {
-    if (info == NULL) {
-        return -1;
-    }
-
-    info->pid = 0;
-    info->title[0] = L'\0';
-
-    HWND hwnd = GetForegroundWindow();
-    if (hwnd == NULL) {
-        return -1;
-    }
-
-    DWORD pid = 0;
-    GetWindowThreadProcessId(hwnd, &pid);
-    if (pid == 0) {
-        return -1;
-    }
-    info->pid = (uint32_t)pid;
-
-    GetWindowTextW(hwnd, info->title, 256);
-
-    return 0;
-}
+#include "screentime.h"
 */
 import "C"
 
