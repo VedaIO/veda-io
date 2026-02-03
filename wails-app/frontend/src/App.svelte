@@ -1,7 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import AppManagement from './lib/AppManagement.svelte';
-import { isAuthenticated } from './lib/authStore';
+import { handleLogout, isAuthenticated } from './lib/authStore';
 import GlobalTitleBar from './lib/GlobalTitleBar.svelte';
 import Login from './lib/Login.svelte';
 import {
@@ -43,23 +43,8 @@ async function handleStop() {
   }
 }
 
-/**
- * Handle user logout
- * Calls backend Logout method then navigates to login page
- * CRITICAL: Must call backend first to clear session, then update frontend state
- */
-async function handleLogout() {
-  try {
-    // Call backend to clear authentication session
-    await window.go.main.App.Logout();
-    // Update frontend state
-    isAuthenticated.set(false);
-    // Navigate to login page using hash routing
-    navigate('/login');
-  } catch (error) {
-    console.error('Lỗi khi đăng xuất:', error);
-    alert('Đã có lỗi xảy ra khi đăng xuất.');
-  }
+async function onLogout() {
+  await handleLogout();
 }
 
 /**
@@ -148,7 +133,7 @@ onMount(async () => {
               <button class="btn btn btn-danger" on:click={handleStop}>
                 Dừng ProcGuard
               </button>
-              <button class="btn btn-outline-secondary" on:click={handleLogout}>
+              <button class="btn btn-outline-secondary" on:click={onLogout}>
                 Đăng xuất
               </button>
             </div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { handleLogout } from './authStore';
+
 // Window runtime functions
 function minimize() {
   window.runtime.WindowMinimise();
@@ -8,7 +10,8 @@ function maximize() {
   window.runtime.WindowToggleMaximise();
 }
 
-function close() {
+async function close() {
+  await handleLogout();
   window.runtime.WindowHide();
 }
 </script>
