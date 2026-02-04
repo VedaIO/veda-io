@@ -24,6 +24,6 @@ go install github.com/wailsapp/wails/v2/cmd/wails@latest
 2. Build the app:
 
 ```bash
-cd wails-app
+cd src
 make build
 ```
