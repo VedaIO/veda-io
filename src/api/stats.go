@@ -49,7 +49,7 @@ func (s *Server) GetAppLeaderboard(since, until string) ([]AppLeaderboardItem, e
 		if displayName == "" {
 			displayName = r.ProcessName
 		}
-		
+
 		leaderboard = append(leaderboard, AppLeaderboardItem{
 			Rank:        i + 1,
 			Name:        displayName,

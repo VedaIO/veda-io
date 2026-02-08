@@ -44,7 +44,7 @@ func GetAppUsageRanking(db *sql.DB, sinceTime, untilTime time.Time) ([]AppUsageI
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []AppUsageItem
 	for rows.Next() {
@@ -92,7 +92,7 @@ func GetWebUsageRanking(db *sql.DB, sinceTime, untilTime time.Time) ([]WebUsageI
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []WebUsageItem
 	for rows.Next() {
@@ -119,7 +119,7 @@ func GetScreenTimeTotals(db *sql.DB, todayStart int64) ([]ScreenTimeRecord, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []ScreenTimeRecord
 	for rows.Next() {
