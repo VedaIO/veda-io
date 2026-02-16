@@ -11,9 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"src/api"
-	"src/internal/daemon"
+	"src/internal/app/screentime"
 	"src/internal/data"
 	"src/internal/data/logger"
+	"src/internal/monitoring"
+	"src/internal/platform/autostart"
 	"src/internal/platform/nativehost"
 	"src/internal/web/native_messaging"
 	"strings"
@@ -52,9 +54,12 @@ func (a *App) startup(ctx context.Context) {
 	// Create API server with database connection
 	a.Server = api.NewServer(db)
 
-	// Start the background daemon that monitors processes and web activity
-	// This runs independently of the GUI - continues even when window is hidden
-	daemon.Start(a.Logger, a.Apps, a.Web)
+	// Start background monitoring services.
+	// This runs independently of the GUI - continues even when window is hidden.
+	if _, err := autostart.EnsureAutostart(); err != nil {
+		log.Printf("Failed to set up autostart: %v", err)
+	}
+	monitoring.StartDefault(a.Logger, a.Apps, screentime.StartScreenTimeMonitor)
 
 	// Ensure Native Messaging Host is registered
 	// This creates the registry key and manifest file so Chrome can find us
