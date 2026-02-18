@@ -1,7 +1,7 @@
-//go:build linux
+//go:build darwin
 
 // Package integrity provides process integrity level functionality.
-package integrity
+package process_integrity
 
 // Integrity Level constants (Windows values, for cross-platform reference)
 const (
@@ -14,7 +14,7 @@ const (
 )
 
 // GetProcessLevel returns the integrity level of a process.
-// Linux doesn't have Windows-style integrity levels, returns MediumRID.
+// macOS doesn't have Windows-style integrity levels, returns MediumRID.
 func GetProcessLevel(pid uint32) (uint32, error) {
 	return MediumRID, nil
 }

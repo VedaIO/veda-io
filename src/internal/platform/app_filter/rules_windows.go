@@ -4,8 +4,8 @@ package app_filter
 
 import (
 	"src/internal/platform/executable"
-	"src/internal/platform/integrity"
 	"src/internal/platform/proc_sensing"
+	"src/internal/platform/process_integrity"
 	"src/internal/platform/window"
 	"strings"
 )
@@ -38,8 +38,8 @@ func ShouldExclude(exePath string, proc *proc_sensing.ProcessInfo) bool {
 
 	// Skip system integrity level processes (system services)
 	if proc != nil {
-		il := integrity.GetProcessLevel(uint32(proc.PID))
-		if il >= integrity.SystemRID {
+		il := process_integrity.GetProcessLevel(uint32(proc.PID))
+		if il >= process_integrity.SystemRID {
 			return true
 		}
 	}

@@ -4,7 +4,7 @@ package window
 
 /*
 #cgo LDFLAGS: -luser32
-#include "window.h"
+#include "window_windows.h"
 */
 import "C"
 

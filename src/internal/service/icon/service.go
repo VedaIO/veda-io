@@ -3,7 +3,7 @@ package icon
 import (
 	"src/internal/data/logger"
 	"src/internal/platform/executable"
-	"src/internal/platform/icon"
+	"src/internal/platform/get_app_icon"
 	"sync"
 )
 

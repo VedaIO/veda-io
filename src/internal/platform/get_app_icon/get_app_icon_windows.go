@@ -4,7 +4,7 @@ package icon
 
 /*
 #cgo LDFLAGS: -lshell32 -lgdi32 -luser32
-#include "icon.h"
+#include "get_app_icon_windows.h"
 #include <stdlib.h>
 */
 import "C"

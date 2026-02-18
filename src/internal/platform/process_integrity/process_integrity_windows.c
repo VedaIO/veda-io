@@ -1,6 +1,6 @@
 //go:build windows
 
-#include "integrity.h"
+#include "process_integrity_windows.h"
 #include <windows.h>
 #include <securitybaseapi.h>
 #include <stdlib.h>

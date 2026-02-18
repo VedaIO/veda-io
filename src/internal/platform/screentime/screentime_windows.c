@@ -1,6 +1,6 @@
 //go:build windows
 
-#include "screentime.h"
+#include "screentime_windows.h"
 #include <windows.h>
 
 int GetActiveWindowInfo(ActiveWindowInfo* info) {

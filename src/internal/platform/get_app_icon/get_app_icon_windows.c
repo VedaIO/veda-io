@@ -1,6 +1,6 @@
 //go:build windows
 
-#include "icon.h"
+#include "get_app_icon_windows.h"
 #include <windows.h>
 #include <shellapi.h>
 #include <wingdi.h>

@@ -1,10 +1,10 @@
 //go:build windows
 
-package integrity
+package process_integrity
 
 /*
 #cgo LDFLAGS: -ladvapi32
-#include "integrity.h"
+#include "process_integrity_windows.h"
 */
 import "C"
 

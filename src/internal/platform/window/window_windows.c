@@ -1,6 +1,6 @@
 //go:build windows
 
-#include "window.h"
+#include "window_windows.h"
 #include <windows.h>
 
 typedef struct {

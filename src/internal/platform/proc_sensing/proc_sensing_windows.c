@@ -1,6 +1,6 @@
 //go:build windows
 
-#include "proc_sensing.h"
+#include "proc_sensing_windows.h"
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>

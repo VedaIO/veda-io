@@ -4,7 +4,7 @@
 package screentime
 
 /*
-#include "screentime.h"
+#include "screentime_windows.h"
 */
 import "C"
 

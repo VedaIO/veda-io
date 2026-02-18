@@ -4,7 +4,7 @@ package proc_sensing
 
 /*
 #cgo LDFLAGS: -lkernel32 -lpsapi
-#include "proc_sensing.h"
+#include "proc_sensing_windows.h"
 */
 import "C"
 import (
