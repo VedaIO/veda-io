@@ -25,13 +25,13 @@ jobs:
 
       - name: Build Binary
         run: |
-          nix develop --command bash -c "cd wails-app && make build VERSION=${{ github.ref_name }}"
+          nix develop --command bash -c "cd src && make build VERSION=${{ github.ref_name }}"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            wails-app/build/bin/ProcGuard.exe
+            src/build/bin/ProcGuard.exe
           generate_release_notes: true
           draft: false
           prerelease: false
