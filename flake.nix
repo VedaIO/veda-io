@@ -24,6 +24,9 @@
         export PATH="$HOME/.local/bin:$PATH"
         export PATH="$HOME/.local/share/go/bin:$PATH"
         export ZIG_GLOBAL_CACHE_DIR="/tmp"
+        export BUN_INSTALL="$HOME/.local/share/bun"
+        export PATH="$BUN_INSTALL/bin:$PATH"
+        export BUN_INSTALL_CACHE_DIR="$HOME/.cache/bun"
       '';
     };
   };
