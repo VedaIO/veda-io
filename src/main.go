@@ -1,161 +1,64 @@
 package main
 
 import (
-	"context"
 	"embed"
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"src/api"
-	"src/internal/app/screentime"
-	"src/internal/data"
-	"src/internal/data/logger"
-	"src/internal/monitoring"
-	"src/internal/platform/autostart"
-	"src/internal/platform/nativehost"
-	"src/internal/web/native_messaging"
-	"strings"
+	"syscall"
 )
 
-// Embed the entire frontend/dist directory into the Go binary
-// This allows the app to be distributed as a single executable
+// To build the launcher, you must first build veda-engine and veda-ui
+// and place the binaries in the bin/ directory relative to this file.
 //
-//go:embed all:frontend/dist
-var assets embed.FS
+//go:embed all:bin
+var embeddedBinaries embed.FS
 
-// startup is called when the Wails app starts
-// The context is saved so we can call runtime methods (WindowShow, etc.) later
-//
-// Responsibilities:
-//  1. Save the Wails runtime context for later use
-//  2. Initialize the database
-//  3. Initialize the logger
-//  4. Create the API server
-//  5. Start the background daemon for process/web monitoring
-//  6. Start the native messaging host for Chrome extension communication
-
-func (a *App) startup(ctx context.Context) {
-	// Save context - CRITICAL for calling ShowWindow() and other runtime methods
-	a.ctx = ctx
-
-	// Initialize database connection
-	db, err := data.InitDB()
+func main() {
+	cacheDir, err := os.UserCacheDir()
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		log.Fatalf("failed to get cache dir: %v", err)
 	}
 
-	// Initialize logger with database
-	logger.NewLogger(db)
-
-	// Create API server with database connection
-	a.Server = api.NewServer(db)
-
-	// Start background monitoring services.
-	// This runs independently of the GUI - continues even when window is hidden.
-	if _, err := autostart.EnsureAutostart(); err != nil {
-		log.Printf("Failed to set up autostart: %v", err)
+	installDir := filepath.Join(cacheDir, "vedaio", "bin")
+	if err := os.MkdirAll(installDir, 0755); err != nil {
+		log.Fatalf("failed to create install dir: %v", err)
 	}
-	monitoring.StartDefault(a.Logger, a.Apps, screentime.StartScreenTimeMonitor)
 
-	// Ensure Native Messaging Host is registered
-	// This creates the registry key and manifest file so Chrome can find us
-	// We do this on every startup to ensure the config is correct
-	if err := nativehost.RegisterExtension("hkanepohpflociaodcicmmfbdaohpceo"); err != nil {
-		log.Printf("Failed to register Store extension: %v", err)
+	// Extract binaries
+	enginePath := filepath.Join(installDir, "veda-engine.exe")
+	uiPath := filepath.Join(installDir, "veda-ui.exe")
+
+	if err := extractFile("bin/veda-engine.exe", enginePath); err != nil {
+		log.Printf("warning: failed to extract engine: %v", err)
 	}
-	if err := nativehost.RegisterExtension("gpaafgcbiejjpfdgmjglehboafdicdjb"); err != nil {
-		log.Printf("Failed to register Dev extension: %v", err)
+	if err := extractFile("bin/veda-ui.exe", uiPath); err != nil {
+		log.Printf("warning: failed to extract UI: %v", err)
+	}
+
+	// Start engine in background
+	log.Println("Starting Veda Engine...")
+	engineCmd := exec.Command(enginePath)
+	engineCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if err := engineCmd.Start(); err != nil {
+		log.Printf("error starting engine: %v", err)
+	}
+
+	// Start UI
+	log.Println("Starting Veda UI...")
+	uiCmd := exec.Command(uiPath)
+	if err := uiCmd.Run(); err != nil {
+		log.Fatalf("error starting UI: %v", err)
 	}
 }
 
-func main() {
-	// CRITICAL: Log startup for debugging
-	// Use absolute path in CacheDir because CWD varies when launched by Chrome
-	cacheDir, _ := os.UserCacheDir()
-	logDir := filepath.Join(cacheDir, "Veda", "logs")
-	_ = os.MkdirAll(logDir, 0755)
-
-	logPath := filepath.Join(logDir, "Veda_debug.log")
-	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if logFile != nil {
-		defer func() { _ = logFile.Close() }()
-		log.SetOutput(logFile)
-	}
-
-	log.Printf("=== PROCGUARD LAUNCHED === Args: %v", os.Args)
-	log.Printf("CWD: %v", func() string { wd, _ := os.Getwd(); return wd }())
-
-	// MODE 1: NATIVE MESSAGING HOST
-	// Chrome launches us with the extension ID as an argument: chrome-extension://...
-	// In this mode, we MUST NOT show a GUI. We only run the message loop.
-	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "chrome-extension://") {
-		log.Println("[MODE] Native Messaging Host detected")
-		native_messaging.Run()
-		log.Println("[MODE] Native Messaging Host exited")
-		return
-	}
-
-	// MODE 2: GUI APPLICATION
-	// User launched us (double-click, start menu, etc.)
-	log.Println("[MODE] GUI Application detected")
-
-	app := NewApp()
-
-	// Check for --background flag to start hidden (e.g. from autostart)
-	startHidden := false
-	for _, arg := range os.Args {
-		if arg == "--background" {
-			startHidden = true
-			break
-		}
-	}
-	if startHidden {
-		log.Println("[MODE] Background/Autostart detected - starting hidden")
-	}
-
-	// Create and run the Wails application
-	err := wails.Run(&options.App{
-		Title:       "Veda",
-		Width:       1024,
-		Height:      768,
-		Frameless:   true, // Enable frameless mode
-		StartHidden: startHidden,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
-		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
-
-		// Windows platform specific options
-		Windows: &windows.Options{
-			WebviewIsTransparent:              false,
-			WindowIsTranslucent:               false,
-			DisableFramelessWindowDecorations: false,
-			WebviewUserDataPath:               filepath.Join(os.Getenv("LOCALAPPDATA"), "Veda", "webview"),
-		},
-
-		// HideWindowOnClose: Keep app running in background
-		HideWindowOnClose: true,
-
-		// SingleInstanceLock: Ensure only one GUI instance runs
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "com.Veda.src",
-			OnSecondInstanceLaunch: func(data options.SecondInstanceData) {
-				log.Println("Second GUI instance detected - showing existing window")
-				app.ShowWindow()
-			},
-		},
-
-		Bind: []interface{}{
-			app,
-		},
-	})
-
+func extractFile(srcPath, dstPath string) error {
+	data, err := embeddedBinaries.ReadFile(srcPath)
 	if err != nil {
-		log.Fatal("Error running Wails app:", err)
+		return err
 	}
+
+	// Only write if different or not exists (simplified here)
+	return os.WriteFile(dstPath, data, 0755)
 }
