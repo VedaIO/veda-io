@@ -1,8 +1,8 @@
-# Makefile for Veda IO (Launcher)
+# Makefile for Veda (Launcher)
 
 VERSION ?= $(shell git describe --tags --always --dirty --first-parent 2>/dev/null || echo "dev")
 
-.PHONY: all build generate build-engine build-ui clean
+.PHONY: all build generate build-engine build-ui clean fmt
 
 all: build
 
@@ -27,6 +27,10 @@ build-ui:
 	$(MAKE) -C ../veda-ui build
 	@mkdir -p bin
 	cp ../veda-ui/build/bin/veda-ui.exe bin/veda-ui.exe
+
+fmt:
+	@echo "Formatting code..."
+	go fmt ./...
 
 clean:
 	@echo "Cleaning..."
