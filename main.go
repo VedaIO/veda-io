@@ -21,7 +21,7 @@ var embeddedBinaries embed.FS
 
 const (
 	pipeName    = `\\.\pipe\veda-anchor`
-	serviceName = "VedaEngine"
+	serviceName = "VedaAnchorEngine"
 )
 
 func main() {
@@ -37,14 +37,14 @@ func main() {
 		log.SetOutput(logFile)
 	}
 
-	log.Printf("=== VEDA LAUNCHER STARTED === Args: %v", os.Args)
+	log.Printf("=== VEDA ANCHOR LAUNCHER STARTED === Args: %v", os.Args)
 
 	// Determine install directory
 	programFiles := os.Getenv("ProgramFiles")
 	if programFiles == "" {
 		programFiles = `C:\Program Files`
 	}
-	installDir := filepath.Join(programFiles, "VedaIO")
+	installDir := filepath.Join(programFiles, "VedaAnchor")
 	enginePath := filepath.Join(installDir, "veda-anchor-engine.exe")
 	uiPath := filepath.Join(installDir, "veda-anchor-ui.exe")
 
@@ -145,8 +145,8 @@ func registerService(exePath string) error {
 	binPath := fmt.Sprintf(`"%s"`, exePath)
 
 	s, err := m.CreateService(serviceName, binPath, mgr.Config{
-		DisplayName:      "VedaIO Engine",
-		Description:      "Core monitoring and blocking engine for VedaIO",
+		DisplayName:      "Veda Anchor Engine",
+		Description:      "Core monitoring and blocking engine for Veda Anchor",
 		StartType:        mgr.StartAutomatic,
 		ServiceStartName: "LocalSystem",
 	})
@@ -185,7 +185,7 @@ func registerUIAutostart(uiPath string) error {
 	}
 	defer key.Close()
 
-	return key.SetStringValue("VedaUI", fmt.Sprintf(`"%s"`, uiPath))
+	return key.SetStringValue("VedaAnchorUI", fmt.Sprintf(`"%s"`, uiPath))
 }
 
 // startService starts the VedaEngine service via SCM.

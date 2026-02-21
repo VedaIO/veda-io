@@ -2,5 +2,5 @@ build.log
 .vscode/
 .direnv/
 bin/
-veda.exe
+veda-anchor.exe
 resource.syso
