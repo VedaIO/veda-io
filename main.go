@@ -48,18 +48,22 @@ func main() {
 	enginePath := filepath.Join(installDir, "veda-anchor-engine.exe")
 	uiPath := filepath.Join(installDir, "veda-anchor-ui.exe")
 
-	// --- Install if needed (first run or upgrade) ---
-	if !isServiceInstalled() {
-		log.Println("[INSTALL] Service not found, running first-time install...")
+	// --- Install if needed ---
+	serviceOK := isServiceInstalled()
+	binariesOK := fileExists(enginePath) && fileExists(uiPath)
+
+	if serviceOK && binariesOK {
+		log.Println("[INSTALL] Already installed, skipping")
+	} else {
+		// If service exists but binaries are missing, clean up stale service first
+		if serviceOK && !binariesOK {
+			log.Println("[INSTALL] Stale service found (binaries missing), cleaning up...")
+			deleteService()
+		}
+		log.Println("[INSTALL] Running install...")
 		if err := install(installDir, enginePath, uiPath); err != nil {
 			log.Fatalf("[INSTALL] Failed: %v", err)
 		}
-	} else {
-		log.Println("[INSTALL] Service already installed, skipping install")
-		// Still update the binaries in case this is an upgrade
-		log.Println("[INSTALL] Updating binaries...")
-		_ = extractFile("bin/veda-anchor-engine.exe", enginePath)
-		_ = extractFile("bin/veda-anchor-ui.exe", uiPath)
 	}
 
 	// --- Launch logic ---
@@ -134,7 +138,30 @@ func isServiceInstalled() bool {
 	return true
 }
 
-// registerService creates the VedaEngine Windows Service with recovery actions.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// deleteService removes the existing service from SCM.
+func deleteService() {
+	m, err := mgr.Connect()
+	if err != nil {
+		log.Printf("[INSTALL] Warning: could not connect to SCM for cleanup: %v", err)
+		return
+	}
+	defer m.Disconnect()
+
+	s, err := m.OpenService(serviceName)
+	if err != nil {
+		return // service doesn't exist, nothing to clean
+	}
+	_ = s.Delete()
+	s.Close()
+	time.Sleep(500 * time.Millisecond)
+}
+
+// registerService creates the AnchorEngine Windows Service with recovery actions.
 func registerService(exePath string) error {
 	m, err := mgr.Connect()
 	if err != nil {
@@ -142,9 +169,7 @@ func registerService(exePath string) error {
 	}
 	defer m.Disconnect()
 
-	binPath := fmt.Sprintf(`"%s"`, exePath)
-
-	s, err := m.CreateService(serviceName, binPath, mgr.Config{
+	s, err := m.CreateService(serviceName, exePath, mgr.Config{
 		DisplayName:      "Veda Anchor Engine",
 		Description:      "Core monitoring and blocking engine for Veda Anchor",
 		StartType:        mgr.StartAutomatic,
