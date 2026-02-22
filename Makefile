@@ -39,3 +39,6 @@ clean:
 	rm -f resource.syso
 	$(MAKE) -C ../veda-anchor-engine clean
 	$(MAKE) -C ../veda-anchor-ui clean
+
+lint:
+	CGO_ENABLED=0 GOOS=windows golangci-lint run
